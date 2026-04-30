@@ -43,36 +43,58 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Fetch DATABASE_URL from SSM
+      - name: Check SSM parameter exists
+        id: ssm_check
         run: |
           SSM_PARAM="${{ inputs.ssm_db_url_param || '/urbanhood/prod/database-url' }}"
+          echo "ssm_param=$SSM_PARAM" >> $GITHUB_OUTPUT
+
+          if aws ssm get-parameter --name "$SSM_PARAM" --with-decryption \
+              --query "Parameter.Value" --output text > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::SSM parameter '$SSM_PARAM' not found."
+            echo "Infrastructure has not been provisioned yet."
+            echo "Merge the Terraform workflow changes and run terraform apply first."
+          fi
+
+      - name: Fetch DATABASE_URL from SSM
+        if: steps.ssm_check.outputs.exists == 'true'
+        run: |
           DB_URL=$(aws ssm get-parameter \
-            --name "$SSM_PARAM" \
+            --name "${{ steps.ssm_check.outputs.ssm_param }}" \
             --with-decryption \
             --query "Parameter.Value" \
             --output text)
-          echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
           echo "::add-mask::$DB_URL"
+          echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
 
       - name: Setup pnpm
+        if: steps.ssm_check.outputs.exists == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
+        if: steps.ssm_check.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install dependencies
+        if: steps.ssm_check.outputs.exists == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
+        if: steps.ssm_check.outputs.exists == 'true'
         run: pnpm --filter @urbanhood/db db:generate
 
       - name: Run migrations
+        if: steps.ssm_check.outputs.exists == 'true'
         run: pnpm --filter @urbanhood/db db:migrate:prod
 
       - name: Trigger Amplify deployment
+        if: steps.ssm_check.outputs.exists == 'true'
         env:
           AMPLIFY_APP_ID: ${{ secrets.AMPLIFY_APP_ID }}
         run: |
