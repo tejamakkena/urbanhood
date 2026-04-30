@@ -36,9 +36,10 @@ module "s3" {
   ] : ["*"]
 }
 
-# ─── SES email ────────────────────────────────────────────────────────────────
+# ─── SES email (only when a sending domain is provided) ──────────────────────
 
 module "ses" {
+  count          = var.sending_domain != "" ? 1 : 0
   source         = "./modules/ses"
   project        = var.project
   env            = var.env
@@ -65,8 +66,12 @@ module "amplify" {
   google_client_id     = var.google_client_id
   google_client_secret = var.google_client_secret
 
-  ses_smtp_username = module.ses.smtp_username
-  ses_smtp_password = module.ses.smtp_password
+  # Email: prefer SES when domain is set, otherwise fall back to custom SMTP
+  ses_smtp_username = var.sending_domain != "" ? module.ses[0].smtp_username : var.smtp_user
+  ses_smtp_password = var.sending_domain != "" ? module.ses[0].smtp_password : var.smtp_password
+  smtp_host         = var.sending_domain != "" ? "email-smtp.${var.aws_region}.amazonaws.com" : var.smtp_host
+  smtp_port         = var.sending_domain != "" ? "587" : var.smtp_port
+  smtp_from         = var.sending_domain != "" ? "Urbanhood <noreply@${var.sending_domain}>" : var.smtp_from
 
   s3_bucket_name       = module.s3.bucket_name
   s3_access_key_id     = module.s3.access_key_id

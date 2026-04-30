@@ -21,11 +21,11 @@ output "s3_bucket_name" {
 }
 
 output "ses_dns_records" {
-  description = "Add these CNAME records to your DNS to verify SES domain"
-  value       = module.ses.dkim_tokens
+  description = "Add these CNAME records to your DNS to verify SES domain (empty when no sending_domain set)"
+  value       = var.sending_domain != "" ? module.ses[0].dkim_tokens : []
 }
 
 output "ses_mail_from_domain" {
-  description = "Add MX record pointing to feedback-smtp.<region>.amazonses.com (priority 10)"
-  value       = module.ses.mail_from_domain
+  description = "Add MX record pointing to feedback-smtp.<region>.amazonses.com (empty when no sending_domain set)"
+  value       = var.sending_domain != "" ? module.ses[0].mail_from_domain : ""
 }

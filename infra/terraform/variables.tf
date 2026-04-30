@@ -26,16 +26,48 @@ variable "github_token" {
   sensitive   = true
 }
 
-# Domain
+# Domain — both optional until you own a domain
 variable "sending_domain" {
-  description = "Domain used for SES sending (must be a domain you own)"
+  description = "Domain used for SES sending. Leave empty to use custom SMTP (e.g. Resend) instead."
   type        = string
+  default     = ""
 }
 
 variable "app_domain" {
-  description = "Custom domain for the web app (leave empty to use Amplify default)"
+  description = "Custom domain for the web app. Leave empty to use the Amplify default *.amplifyapp.com domain."
   type        = string
   default     = ""
+}
+
+# Custom SMTP — used when sending_domain is empty (e.g. Resend free tier)
+variable "smtp_host" {
+  description = "SMTP host when not using SES (e.g. smtp.resend.com)"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  type    = string
+  default = "587"
+}
+
+variable "smtp_user" {
+  description = "SMTP username (for Resend this is the literal string 'resend')"
+  type      = string
+  default   = ""
+}
+
+variable "smtp_password" {
+  description = "SMTP password / API key"
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "smtp_from" {
+  description = "From address shown to recipients (e.g. onboarding@resend.dev for Resend free tier)"
+  type    = string
+  default = ""
 }
 
 # Auth / OAuth

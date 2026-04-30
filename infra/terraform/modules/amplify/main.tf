@@ -33,11 +33,11 @@ resource "aws_amplify_app" "main" {
     NEXT_PUBLIC_APP_URL       = "https://${var.app_domain}"
     GOOGLE_CLIENT_ID          = var.google_client_id
     GOOGLE_CLIENT_SECRET      = var.google_client_secret
-    EMAIL_SERVER_HOST         = "email-smtp.${var.aws_region}.amazonaws.com"
-    EMAIL_SERVER_PORT         = "587"
+    EMAIL_SERVER_HOST         = var.smtp_host
+    EMAIL_SERVER_PORT         = var.smtp_port
     EMAIL_SERVER_USER         = var.ses_smtp_username
     EMAIL_SERVER_PASSWORD     = var.ses_smtp_password
-    EMAIL_FROM                = "Urbanhood <noreply@${var.sending_domain}>"
+    EMAIL_FROM                = var.smtp_from
     AWS_S3_BUCKET             = var.s3_bucket_name
     AWS_S3_REGION             = var.aws_region
     AWS_S3_ACCESS_KEY_ID      = var.s3_access_key_id

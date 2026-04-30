@@ -3,10 +3,20 @@ env        = "prod"
 project    = "urbanhood"
 
 github_repository = "https://github.com/tejamakkena/urbanhood"
-# github_token is set via TF_VAR_github_token env var in CI — never commit this
+# github_token — set via TF_VAR_github_token (GitHub Secret), never commit
 
-sending_domain = "yourdomain.com"
-app_domain     = "app.yourdomain.com" # or leave "" for Amplify default
+# ── Domain (leave both empty until you own a domain) ─────────────────────────
+sending_domain = ""   # e.g. "urbanhood.com" — enables SES when set
+app_domain     = ""   # e.g. "app.urbanhood.com" — uses Amplify default when empty
 
+# ── Email: custom SMTP used when sending_domain = "" ─────────────────────────
+# Resend free tier (no domain needed): https://resend.com
+#   smtp_host     = "smtp.resend.com"
+#   smtp_port     = "587"
+#   smtp_user     = "resend"
+#   smtp_password = "<your-resend-api-key>"  # set via TF_VAR_smtp_password
+#   smtp_from     = "Urbanhood <onboarding@resend.dev>"
+
+# ── RDS ───────────────────────────────────────────────────────────────────────
 rds_instance_class      = "db.t4g.micro"
-rds_deletion_protection = false # set true once live in production
+rds_deletion_protection = false   # set true once live in production

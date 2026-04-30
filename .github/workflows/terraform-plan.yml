@@ -62,7 +62,11 @@ jobs:
             -var="google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}" \
             -var="google_client_secret=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
             -var="sending_domain=${{ secrets.SENDING_DOMAIN }}" \
-            -var="app_domain=${{ secrets.APP_DOMAIN }}"
+            -var="app_domain=${{ secrets.APP_DOMAIN }}" \
+            -var="smtp_host=${{ secrets.SMTP_HOST }}" \
+            -var="smtp_user=${{ secrets.SMTP_USER }}" \
+            -var="smtp_password=${{ secrets.SMTP_PASSWORD }}" \
+            -var="smtp_from=${{ secrets.SMTP_FROM }}"
         continue-on-error: true
 
       - name: Post plan as PR comment
