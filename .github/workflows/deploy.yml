@@ -48,8 +48,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: typecheck
     environment: production
+    env:
+      AMPLIFY_APP_ID: ${{ secrets.AMPLIFY_APP_ID }}
 
     steps:
+      - name: Check AMPLIFY_APP_ID is set
+        run: |
+          if [ -z "$AMPLIFY_APP_ID" ]; then
+            echo "AMPLIFY_APP_ID secret is not set."
+            echo "Run terraform apply first, then add the app ID to GitHub Secrets."
+            exit 1
+          fi
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -60,7 +70,7 @@ jobs:
         id: amplify
         run: |
           JOB_ID=$(aws amplify start-job \
-            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+            --app-id "$AMPLIFY_APP_ID" \
             --branch-name main \
             --job-type RELEASE \
             --query "jobSummary.jobId" \
@@ -70,13 +80,12 @@ jobs:
 
       - name: Wait for Amplify deployment
         run: |
-          APP_ID="${{ secrets.AMPLIFY_APP_ID }}"
           JOB_ID="${{ steps.amplify.outputs.job_id }}"
           echo "Waiting for job $JOB_ID..."
 
           for i in $(seq 1 40); do
             STATUS=$(aws amplify get-job \
-              --app-id "$APP_ID" \
+              --app-id "$AMPLIFY_APP_ID" \
               --branch-name main \
               --job-id "$JOB_ID" \
               --query "job.summary.status" \

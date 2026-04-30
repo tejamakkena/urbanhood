@@ -73,10 +73,16 @@ jobs:
         run: pnpm --filter @urbanhood/db db:migrate:prod
 
       - name: Trigger Amplify deployment
-        if: ${{ secrets.AMPLIFY_APP_ID != '' }}
+        env:
+          AMPLIFY_APP_ID: ${{ secrets.AMPLIFY_APP_ID }}
         run: |
+          if [ -z "$AMPLIFY_APP_ID" ]; then
+            echo "AMPLIFY_APP_ID not set yet — skipping deployment trigger."
+            echo "Add it to GitHub Secrets after first terraform apply."
+            exit 0
+          fi
           aws amplify start-job \
-            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+            --app-id "$AMPLIFY_APP_ID" \
             --branch-name main \
             --job-type RELEASE \
             --query "jobSummary.jobId" \
