@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss'
-import { colors, typography } from '@urbanhood/ui/tokens'
+import { colors } from '@urbanhood/ui/tokens'
 
 const config: Config = {
   content: [
@@ -13,8 +13,10 @@ const config: Config = {
         accent: colors.accent,
         neutral: colors.neutral,
       },
-      fontFamily: typography.fontFamily,
-      fontSize: typography.fontSize,
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
       borderRadius: {
         '4xl': '2rem',
       },
