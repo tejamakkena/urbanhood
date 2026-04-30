@@ -1,0 +1,101 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/ui/**'
+      - 'amplify.yml'
+      - '.github/workflows/deploy.yml'
+      # Exclude infra and db schema — those have their own workflows
+      - '!infra/**'
+      - '!packages/db/prisma/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client (needed for type check)
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+        run: pnpm --filter @urbanhood/db db:generate
+
+      - name: Type check
+        run: pnpm --filter @urbanhood/web typecheck
+
+  deploy:
+    name: Trigger Amplify Build
+    runs-on: ubuntu-latest
+    needs: typecheck
+    environment: production
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Start Amplify job
+        id: amplify
+        run: |
+          JOB_ID=$(aws amplify start-job \
+            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+            --branch-name main \
+            --job-type RELEASE \
+            --query "jobSummary.jobId" \
+            --output text)
+          echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "Triggered Amplify job: $JOB_ID"
+
+      - name: Wait for Amplify deployment
+        run: |
+          APP_ID="${{ secrets.AMPLIFY_APP_ID }}"
+          JOB_ID="${{ steps.amplify.outputs.job_id }}"
+          echo "Waiting for job $JOB_ID..."
+
+          for i in $(seq 1 40); do
+            STATUS=$(aws amplify get-job \
+              --app-id "$APP_ID" \
+              --branch-name main \
+              --job-id "$JOB_ID" \
+              --query "job.summary.status" \
+              --output text)
+
+            echo "[$i/40] Status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEED" ]; then
+              echo "Deployment succeeded."
+              exit 0
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Deployment failed with status: $STATUS"
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          echo "Timed out waiting for deployment."
+          exit 1

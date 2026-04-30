@@ -1,0 +1,85 @@
+name: DB Migrate
+
+on:
+  # Called by terraform-apply.yml after infra changes
+  workflow_call:
+    inputs:
+      ssm_db_url_param:
+        required: false
+        type: string
+        default: "/urbanhood/prod/database-url"
+
+  # Also triggered on app code changes that include schema modifications
+  push:
+    branches: [main]
+    paths:
+      - 'packages/db/prisma/schema.prisma'
+      - 'packages/db/prisma/migrations/**'
+      - '.github/workflows/db-migrate.yml'
+
+  # Allow manual trigger for emergency re-runs
+  workflow_dispatch:
+    inputs:
+      ssm_db_url_param:
+        description: "SSM parameter name for DATABASE_URL"
+        required: false
+        default: "/urbanhood/prod/database-url"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  migrate:
+    name: Prisma Migrate Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Fetch DATABASE_URL from SSM
+        run: |
+          SSM_PARAM="${{ inputs.ssm_db_url_param || '/urbanhood/prod/database-url' }}"
+          DB_URL=$(aws ssm get-parameter \
+            --name "$SSM_PARAM" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+          echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "::add-mask::$DB_URL"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @urbanhood/db db:generate
+
+      - name: Run migrations
+        run: pnpm --filter @urbanhood/db db:migrate:prod
+
+      - name: Trigger Amplify deployment
+        if: ${{ secrets.AMPLIFY_APP_ID != '' }}
+        run: |
+          aws amplify start-job \
+            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+            --branch-name main \
+            --job-type RELEASE \
+            --query "jobSummary.jobId" \
+            --output text
