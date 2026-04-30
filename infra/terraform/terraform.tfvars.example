@@ -1,0 +1,12 @@
+aws_region = "us-east-1"
+env        = "prod"
+project    = "urbanhood"
+
+github_repository = "https://github.com/tejamakkena/urbanhood"
+# github_token is set via TF_VAR_github_token env var in CI — never commit this
+
+sending_domain = "yourdomain.com"
+app_domain     = "app.yourdomain.com" # or leave "" for Amplify default
+
+rds_instance_class      = "db.t4g.micro"
+rds_deletion_protection = false # set true once live in production
