@@ -5,14 +5,35 @@ applications:
       phases:
         preBuild:
           commands:
-            - npm install -g pnpm@9
-            - cd ../.. && NODE_ENV=development pnpm install --frozen-lockfile
-            - cd ../.. && pnpm --filter @urbanhood/db db:generate
+            - |
+              set -e
+              npm install -g pnpm@9
+              cd ../..
+              NODE_ENV=development pnpm install --frozen-lockfile
+              pnpm --filter @urbanhood/db db:generate
         build:
           commands:
-            - cd ../.. && pnpm --filter @urbanhood/web build
-            - cp -r .next/static .next/standalone/.next/static
-            - '[ -d public ] && cp -r public .next/standalone/public || true'
+            - |
+              set -e
+              cd ../..
+              pnpm --filter @urbanhood/web build
+              echo "==== .next contents ===="
+              ls -la apps/web/.next/
+              STANDALONE_DIR="apps/web/.next/standalone"
+              if [ -d "$STANDALONE_DIR/apps/web" ]; then
+                # Nested structure from outputFileTracingRoot pointing to monorepo root
+                cp -r apps/web/.next/static "$STANDALONE_DIR/apps/web/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/apps/web/public" || true
+                # Flatten so server.js is at standalone root for Amplify SSR
+                cp -r "$STANDALONE_DIR/apps/web/." "$STANDALONE_DIR/"
+                rm -rf "$STANDALONE_DIR/apps"
+              else
+                # Flat structure
+                cp -r apps/web/.next/static "$STANDALONE_DIR/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/public" || true
+              fi
+              echo "==== final standalone contents ===="
+              ls -la "$STANDALONE_DIR"
       artifacts:
         baseDirectory: .next/standalone
         files:
