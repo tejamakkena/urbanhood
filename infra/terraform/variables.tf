@@ -88,7 +88,7 @@ variable "google_client_secret" {
 # RDS
 variable "rds_instance_class" {
   type    = string
-  default = "db.t4g.micro"
+  default = "db.t3.micro"
 }
 
 variable "rds_deletion_protection" {
