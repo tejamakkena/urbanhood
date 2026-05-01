@@ -5,35 +5,33 @@ applications:
       phases:
         preBuild:
           commands:
-            - |
-              set -e
-              npm install -g pnpm@9
-              cd ../..
-              NODE_ENV=development pnpm install --frozen-lockfile
-              pnpm --filter @urbanhood/db db:generate
+            - npm install -g pnpm@9
+            - cd "$(git rev-parse --show-toplevel)" && NODE_ENV=development pnpm install --frozen-lockfile
+            - cd "$(git rev-parse --show-toplevel)" && pnpm --filter @urbanhood/db db:generate
         build:
           commands:
             - |
               set -e
-              cd ../..
+              ROOT="$(git rev-parse --show-toplevel)"
+              echo "=== repo root: $ROOT ==="
+              cd "$ROOT"
               pnpm --filter @urbanhood/web build
-              echo "==== .next contents ===="
+              echo "=== .next contents ==="
               ls -la apps/web/.next/
-              STANDALONE_DIR="apps/web/.next/standalone"
-              if [ -d "$STANDALONE_DIR/apps/web" ]; then
-                # Nested structure from outputFileTracingRoot pointing to monorepo root
-                cp -r apps/web/.next/static "$STANDALONE_DIR/apps/web/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/apps/web/public" || true
-                # Flatten so server.js is at standalone root for Amplify SSR
-                cp -r "$STANDALONE_DIR/apps/web/." "$STANDALONE_DIR/"
-                rm -rf "$STANDALONE_DIR/apps"
+              SD="apps/web/.next/standalone"
+              if [ -d "$SD/apps/web" ]; then
+                echo "=== nested standalone structure detected ==="
+                cp -r apps/web/.next/static "$SD/apps/web/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$SD/apps/web/public" || true
+                cp -r "$SD/apps/web/." "$SD/"
+                rm -rf "$SD/apps"
               else
-                # Flat structure
-                cp -r apps/web/.next/static "$STANDALONE_DIR/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/public" || true
+                echo "=== flat standalone structure detected ==="
+                cp -r apps/web/.next/static "$SD/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
               fi
-              echo "==== final standalone contents ===="
-              ls -la "$STANDALONE_DIR"
+              echo "=== final standalone ==="
+              ls -la "$SD"
       artifacts:
         baseDirectory: .next/standalone
         files:
