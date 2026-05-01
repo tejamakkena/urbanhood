@@ -30,8 +30,6 @@ resource "aws_amplify_app" "main" {
     AMPLIFY_MONOREPO_APP_ROOT = "apps/web"
     DATABASE_URL              = var.database_url
     NEXTAUTH_SECRET           = var.nextauth_secret
-    NEXTAUTH_URL              = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
-    NEXT_PUBLIC_APP_URL       = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
     GOOGLE_CLIENT_ID          = var.google_client_id
     GOOGLE_CLIENT_SECRET      = var.google_client_secret
     EMAIL_SERVER_HOST         = var.smtp_host
@@ -66,7 +64,10 @@ resource "aws_amplify_branch" "main" {
   framework = "Next.js - SSR"
   stage     = var.env == "prod" ? "PRODUCTION" : "DEVELOPMENT"
 
-  environment_variables = {}
+  environment_variables = {
+    NEXTAUTH_URL        = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
+    NEXT_PUBLIC_APP_URL = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
+  }
 }
 
 resource "aws_amplify_domain_association" "main" {
