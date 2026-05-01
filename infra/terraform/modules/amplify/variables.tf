@@ -1,6 +1,14 @@
-variable "project" { type = string }
-variable "env" { type = string }
-variable "aws_region" { type = string }
+variable "project" {
+  type = string
+}
+
+variable "env" {
+  type = string
+}
+
+variable "aws_region" {
+  type = string
+}
 
 variable "github_repository" {
   description = "Full GitHub repo URL e.g. https://github.com/tejamakkena/urbanhood"

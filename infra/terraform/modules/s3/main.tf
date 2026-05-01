@@ -13,7 +13,9 @@ resource "aws_s3_bucket_public_access_block" "uploads" {
 resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
   rule {
-    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
   }
 }
 
@@ -34,7 +36,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
     id     = "abort-incomplete-multipart"
     status = "Enabled"
     filter {}
-    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
 }
 

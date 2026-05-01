@@ -53,21 +53,21 @@ variable "smtp_port" {
 
 variable "smtp_user" {
   description = "SMTP username (for Resend this is the literal string 'resend')"
-  type      = string
-  default   = ""
+  type        = string
+  default     = ""
 }
 
 variable "smtp_password" {
   description = "SMTP password / API key"
-  type      = string
-  sensitive = true
-  default   = ""
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "smtp_from" {
   description = "From address shown to recipients (e.g. onboarding@resend.dev for Resend free tier)"
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 # Auth / OAuth
