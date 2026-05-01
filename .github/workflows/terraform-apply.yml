@@ -7,6 +7,8 @@ on:
       - 'infra/terraform/**'
       - '.github/workflows/terraform-apply.yml'
 
+  workflow_dispatch:
+
 permissions:
   id-token: write
   contents: read
