@@ -9,14 +9,11 @@ applications:
               set -ex
               echo "=== Initial PWD: $PWD ==="
               echo "=== AMPLIFY_MONOREPO_APP_ROOT: $AMPLIFY_MONOREPO_APP_ROOT ==="
-              ls -la
-              # Walk up until we find pnpm-workspace.yaml
               while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
                 cd ..
               done
-              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found in any parent of cwd"; exit 1; }
+              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
               echo "=== Resolved repo root: $PWD ==="
-              ls -la
               npm install -g pnpm@9
               NODE_ENV=development pnpm install --frozen-lockfile
               pnpm --filter @urbanhood/db db:generate
@@ -24,36 +21,35 @@ applications:
           commands:
             - |
               set -ex
-              echo "=== Initial PWD: $PWD ==="
               while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
                 cd ..
               done
               [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
               echo "=== Building from repo root: $PWD ==="
               pnpm --filter @urbanhood/web build
-              echo "=== Build done. Locating .next directories ==="
-              find . -maxdepth 4 -type d -name ".next" -not -path "*/node_modules/*" 2>/dev/null
-              ls -la apps/web/.next/
+
               SD="apps/web/.next/standalone"
-              if [ ! -d "$SD" ]; then
-                echo "ERROR: standalone dir missing at $SD"
-                exit 1
-              fi
+              [ -d "$SD" ] || { echo "ERROR: standalone dir missing at $SD"; exit 1; }
+
+              # Flatten nested standalone (caused by outputFileTracingRoot=monorepo root)
               if [ -d "$SD/apps/web" ]; then
-                echo "=== nested standalone structure ==="
-                cp -r apps/web/.next/static "$SD/apps/web/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$SD/apps/web/public" || true
-                cp -r "$SD/apps/web/." "$SD/"
+                echo "=== flattening nested standalone via tar ==="
+                ( cd "$SD/apps/web" && tar cf - . ) | ( cd "$SD" && tar xf - )
                 rm -rf "$SD/apps"
-              else
-                echo "=== flat standalone structure ==="
-                cp -r apps/web/.next/static "$SD/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
               fi
-              echo "=== final standalone contents ==="
-              ls -la "$SD"
+
+              # Copy static and public into standalone (Next.js standalone doesn't do this)
+              cp -r apps/web/.next/static "$SD/.next/static"
+              [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
+
+              echo "=== required-server-files.json present? ==="
+              ls -la apps/web/.next/required-server-files.json
+              echo "=== standalone server.js present? ==="
+              ls -la "$SD/server.js"
+              echo "=== .next contents ==="
+              ls -la apps/web/.next/
       artifacts:
-        baseDirectory: .next/standalone
+        baseDirectory: .next
         files:
           - '**/*'
       cache:
