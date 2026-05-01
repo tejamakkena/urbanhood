@@ -5,32 +5,52 @@ applications:
       phases:
         preBuild:
           commands:
-            - npm install -g pnpm@9
-            - cd "$(git rev-parse --show-toplevel)" && NODE_ENV=development pnpm install --frozen-lockfile
-            - cd "$(git rev-parse --show-toplevel)" && pnpm --filter @urbanhood/db db:generate
+            - |
+              set -ex
+              echo "=== Initial PWD: $PWD ==="
+              echo "=== AMPLIFY_MONOREPO_APP_ROOT: $AMPLIFY_MONOREPO_APP_ROOT ==="
+              ls -la
+              # Walk up until we find pnpm-workspace.yaml
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
+                cd ..
+              done
+              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found in any parent of cwd"; exit 1; }
+              echo "=== Resolved repo root: $PWD ==="
+              ls -la
+              npm install -g pnpm@9
+              NODE_ENV=development pnpm install --frozen-lockfile
+              pnpm --filter @urbanhood/db db:generate
         build:
           commands:
             - |
-              set -e
-              ROOT="$(git rev-parse --show-toplevel)"
-              echo "=== repo root: $ROOT ==="
-              cd "$ROOT"
+              set -ex
+              echo "=== Initial PWD: $PWD ==="
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
+                cd ..
+              done
+              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
+              echo "=== Building from repo root: $PWD ==="
               pnpm --filter @urbanhood/web build
-              echo "=== .next contents ==="
+              echo "=== Build done. Locating .next directories ==="
+              find . -maxdepth 4 -type d -name ".next" -not -path "*/node_modules/*" 2>/dev/null
               ls -la apps/web/.next/
               SD="apps/web/.next/standalone"
+              if [ ! -d "$SD" ]; then
+                echo "ERROR: standalone dir missing at $SD"
+                exit 1
+              fi
               if [ -d "$SD/apps/web" ]; then
-                echo "=== nested standalone structure detected ==="
+                echo "=== nested standalone structure ==="
                 cp -r apps/web/.next/static "$SD/apps/web/.next/static"
                 [ -d apps/web/public ] && cp -r apps/web/public "$SD/apps/web/public" || true
                 cp -r "$SD/apps/web/." "$SD/"
                 rm -rf "$SD/apps"
               else
-                echo "=== flat standalone structure detected ==="
+                echo "=== flat standalone structure ==="
                 cp -r apps/web/.next/static "$SD/.next/static"
                 [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
               fi
-              echo "=== final standalone ==="
+              echo "=== final standalone contents ==="
               ls -la "$SD"
       artifacts:
         baseDirectory: .next/standalone
