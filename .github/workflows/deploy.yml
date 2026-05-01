@@ -12,6 +12,8 @@ on:
       - '!infra/**'
       - '!packages/db/prisma/**'
 
+  workflow_dispatch:
+
 permissions:
   id-token: write
   contents: read
