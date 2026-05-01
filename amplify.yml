@@ -11,6 +11,9 @@ applications:
         build:
           commands:
             - cd ../.. && pnpm --filter @urbanhood/web build
+            # Standalone output requires static assets to be copied manually
+            - cp -r .next/static .next/standalone/.next/static
+            - '[ -d public ] && cp -r public .next/standalone/public || true'
       artifacts:
         baseDirectory: .next
         files:
