@@ -71,7 +71,7 @@ resource "aws_amplify_branch" "main" {
 resource "aws_amplify_domain_association" "main" {
   count  = var.app_domain != "" ? 1 : 0
   app_id = aws_amplify_app.main.id
-  domain = var.app_domain
+  domain_name = var.app_domain
 
   sub_domain {
     branch_name = aws_amplify_branch.main.branch_name
