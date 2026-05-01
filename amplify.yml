@@ -6,34 +6,52 @@ applications:
         preBuild:
           commands:
             - |
-              set -e
+              set -ex
+              echo "=== Initial PWD: $PWD ==="
+              echo "=== AMPLIFY_MONOREPO_APP_ROOT: $AMPLIFY_MONOREPO_APP_ROOT ==="
+              ls -la
+              # Walk up until we find pnpm-workspace.yaml
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
+                cd ..
+              done
+              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found in any parent of cwd"; exit 1; }
+              echo "=== Resolved repo root: $PWD ==="
+              ls -la
               npm install -g pnpm@9
-              cd ../..
               NODE_ENV=development pnpm install --frozen-lockfile
               pnpm --filter @urbanhood/db db:generate
         build:
           commands:
             - |
-              set -e
-              cd ../..
+              set -ex
+              echo "=== Initial PWD: $PWD ==="
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
+                cd ..
+              done
+              [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
+              echo "=== Building from repo root: $PWD ==="
               pnpm --filter @urbanhood/web build
-              echo "==== .next contents ===="
+              echo "=== Build done. Locating .next directories ==="
+              find . -maxdepth 4 -type d -name ".next" -not -path "*/node_modules/*" 2>/dev/null
               ls -la apps/web/.next/
-              STANDALONE_DIR="apps/web/.next/standalone"
-              if [ -d "$STANDALONE_DIR/apps/web" ]; then
-                # Nested structure from outputFileTracingRoot pointing to monorepo root
-                cp -r apps/web/.next/static "$STANDALONE_DIR/apps/web/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/apps/web/public" || true
-                # Flatten so server.js is at standalone root for Amplify SSR
-                cp -r "$STANDALONE_DIR/apps/web/." "$STANDALONE_DIR/"
-                rm -rf "$STANDALONE_DIR/apps"
-              else
-                # Flat structure
-                cp -r apps/web/.next/static "$STANDALONE_DIR/.next/static"
-                [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE_DIR/public" || true
+              SD="apps/web/.next/standalone"
+              if [ ! -d "$SD" ]; then
+                echo "ERROR: standalone dir missing at $SD"
+                exit 1
               fi
-              echo "==== final standalone contents ===="
-              ls -la "$STANDALONE_DIR"
+              if [ -d "$SD/apps/web" ]; then
+                echo "=== nested standalone structure ==="
+                cp -r apps/web/.next/static "$SD/apps/web/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$SD/apps/web/public" || true
+                cp -r "$SD/apps/web/." "$SD/"
+                rm -rf "$SD/apps"
+              else
+                echo "=== flat standalone structure ==="
+                cp -r apps/web/.next/static "$SD/.next/static"
+                [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
+              fi
+              echo "=== final standalone contents ==="
+              ls -la "$SD"
       artifacts:
         baseDirectory: .next/standalone
         files:
