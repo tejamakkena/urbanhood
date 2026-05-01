@@ -7,13 +7,9 @@ applications:
           commands:
             - |
               set -ex
-              echo "=== Initial PWD: $PWD ==="
-              echo "=== AMPLIFY_MONOREPO_APP_ROOT: $AMPLIFY_MONOREPO_APP_ROOT ==="
-              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
-                cd ..
-              done
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do cd ..; done
               [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
-              echo "=== Resolved repo root: $PWD ==="
+              echo "=== repo root: $PWD ==="
               npm install -g pnpm@9
               NODE_ENV=development pnpm install --frozen-lockfile
               pnpm --filter @urbanhood/db db:generate
@@ -21,35 +17,45 @@ applications:
           commands:
             - |
               set -ex
-              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do
-                cd ..
-              done
+              while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do cd ..; done
               [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
-              echo "=== Building from repo root: $PWD ==="
+              echo "=== building from: $PWD ==="
               pnpm --filter @urbanhood/web build
 
               SD="apps/web/.next/standalone"
-              [ -d "$SD" ] || { echo "ERROR: standalone dir missing at $SD"; exit 1; }
+              [ -d "$SD" ] || { echo "ERROR: standalone dir missing"; exit 1; }
 
-              # Flatten nested standalone (caused by outputFileTracingRoot=monorepo root)
+              # Flatten nested structure produced by outputFileTracingRoot=monorepo root
               if [ -d "$SD/apps/web" ]; then
-                echo "=== flattening nested standalone via tar ==="
+                echo "=== flattening nested standalone ==="
                 ( cd "$SD/apps/web" && tar cf - . ) | ( cd "$SD" && tar xf - )
                 rm -rf "$SD/apps"
               fi
 
-              # Copy static and public into standalone (Next.js standalone doesn't do this)
+              # Amplify checks for required-server-files.json at the artifact root.
+              # With baseDirectory=.next/standalone, artifact root is standalone/.
+              # The file lives in .next/ (not standalone/), so copy it in.
+              cp apps/web/.next/required-server-files.json "$SD/"
+
+              # Copy static assets and public dir into standalone
               cp -r apps/web/.next/static "$SD/.next/static"
               [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
 
-              echo "=== required-server-files.json present? ==="
-              ls -la apps/web/.next/required-server-files.json
-              echo "=== standalone server.js present? ==="
-              ls -la "$SD/server.js"
-              echo "=== .next contents ==="
-              ls -la apps/web/.next/
+              # Verify all three things Amplify checks for
+              [ -f "$SD/required-server-files.json" ] \
+                && echo "OK: required-server-files.json" \
+                || { echo "FAIL: required-server-files.json missing"; exit 1; }
+              [ -f "$SD/server.js" ] \
+                && echo "OK: server.js" \
+                || { echo "FAIL: server.js missing"; exit 1; }
+              echo "=== node_modules/next location ==="
+              find "$SD/node_modules" -maxdepth 4 -name "package.json" \
+                -path "*/next/package.json" 2>/dev/null | head -5
+              [ -d "$SD/node_modules/next" ] \
+                && echo "OK: node_modules/next" \
+                || echo "WARNING: node_modules/next not at flat path (may be in .pnpm)"
       artifacts:
-        baseDirectory: .next
+        baseDirectory: .next/standalone
         files:
           - '**/*'
       cache:
