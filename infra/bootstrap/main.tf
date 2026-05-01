@@ -108,6 +108,8 @@ resource "aws_iam_policy" "github_actions" {
           "ec2:DeleteSecurityGroup",
           "ec2:AuthorizeSecurityGroupIngress",
           "ec2:RevokeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupEgress",
           "ec2:CreateTags",
           "ec2:DeleteTags",
           "ssm:*",
