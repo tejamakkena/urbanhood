@@ -29,8 +29,8 @@ resource "aws_amplify_app" "main" {
   environment_variables = {
     DATABASE_URL              = var.database_url
     NEXTAUTH_SECRET           = var.nextauth_secret
-    NEXTAUTH_URL              = "https://${var.app_domain}"
-    NEXT_PUBLIC_APP_URL       = "https://${var.app_domain}"
+    NEXTAUTH_URL              = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
+    NEXT_PUBLIC_APP_URL       = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
     GOOGLE_CLIENT_ID          = var.google_client_id
     GOOGLE_CLIENT_SECRET      = var.google_client_secret
     EMAIL_SERVER_HOST         = var.smtp_host
@@ -38,10 +38,10 @@ resource "aws_amplify_app" "main" {
     EMAIL_SERVER_USER         = var.ses_smtp_username
     EMAIL_SERVER_PASSWORD     = var.ses_smtp_password
     EMAIL_FROM                = var.smtp_from
-    S3_BUCKET             = var.s3_bucket_name
-    S3_REGION             = var.aws_region
-    S3_ACCESS_KEY_ID      = var.s3_access_key_id
-    S3_SECRET_ACCESS_KEY  = var.s3_secret_access_key
+    S3_BUCKET                 = var.s3_bucket_name
+    S3_REGION                 = var.aws_region
+    S3_ACCESS_KEY_ID          = var.s3_access_key_id
+    S3_SECRET_ACCESS_KEY      = var.s3_secret_access_key
     NODE_ENV                  = "production"
     _LIVE_UPDATES             = jsonencode([{ pkg = "next", type = "framework", version = "latest" }])
   }
