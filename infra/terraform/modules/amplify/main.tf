@@ -27,6 +27,7 @@ resource "aws_amplify_app" "main" {
   build_spec = null
 
   environment_variables = {
+    AMPLIFY_MONOREPO_APP_ROOT = "apps/web"
     DATABASE_URL              = var.database_url
     NEXTAUTH_SECRET           = var.nextauth_secret
     NEXTAUTH_URL              = var.app_domain != "" ? "https://${var.app_domain}" : "https://${var.branch_name}.${aws_amplify_app.main.default_domain}"
