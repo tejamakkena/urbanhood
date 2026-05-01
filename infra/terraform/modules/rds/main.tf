@@ -1,7 +1,7 @@
 resource "random_password" "db" {
   length           = 32
   special          = true
-  override_special = "!#$%&*()-_=+[]{}:?"
+  override_special = "!#$%&*()-_=+[]{}"
 }
 
 resource "aws_ssm_parameter" "db_password" {
@@ -60,5 +60,5 @@ resource "aws_db_parameter_group" "main" {
 resource "aws_ssm_parameter" "database_url" {
   name  = "/${var.project}/${var.env}/database-url"
   type  = "SecureString"
-  value = "postgresql://${var.db_username}:${random_password.db.result}@${aws_db_instance.main.address}:5432/${var.db_name}?sslmode=require"
+  value = "postgresql://${var.db_username}:${urlencode(random_password.db.result)}@${aws_db_instance.main.address}:5432/${var.db_name}?sslmode=require"
 }
