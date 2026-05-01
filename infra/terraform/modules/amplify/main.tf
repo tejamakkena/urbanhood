@@ -38,10 +38,10 @@ resource "aws_amplify_app" "main" {
     EMAIL_SERVER_USER         = var.ses_smtp_username
     EMAIL_SERVER_PASSWORD     = var.ses_smtp_password
     EMAIL_FROM                = var.smtp_from
-    AWS_S3_BUCKET             = var.s3_bucket_name
-    AWS_S3_REGION             = var.aws_region
-    AWS_S3_ACCESS_KEY_ID      = var.s3_access_key_id
-    AWS_S3_SECRET_ACCESS_KEY  = var.s3_secret_access_key
+    S3_BUCKET             = var.s3_bucket_name
+    S3_REGION             = var.aws_region
+    S3_ACCESS_KEY_ID      = var.s3_access_key_id
+    S3_SECRET_ACCESS_KEY  = var.s3_secret_access_key
     NODE_ENV                  = "production"
     _LIVE_UPDATES             = jsonencode([{ pkg = "next", type = "framework", version = "latest" }])
   }
