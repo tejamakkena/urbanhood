@@ -20,42 +20,58 @@ applications:
               while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do cd ..; done
               [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
               echo "=== building from: $PWD ==="
+
+              # Step 1: Build Next.js (produces .next/standalone with nested apps/web/)
               pnpm --filter @urbanhood/web build
 
               SD="apps/web/.next/standalone"
-              [ -d "$SD" ] || { echo "ERROR: standalone dir missing"; exit 1; }
+              DEPLOY="apps/web/.next/deploy"
 
-              # Flatten nested structure produced by outputFileTracingRoot=monorepo root
+              [ -d "$SD" ] || { echo "ERROR: standalone dir missing after build"; exit 1; }
+
+              # Step 2: pnpm deploy creates a self-contained dir with all production deps.
+              # Unlike the raw pnpm store, every symlink in .pnpm resolves within DEPLOY/,
+              # so there are no broken cross-directory symlinks after Amplify copies files.
+              pnpm --filter @urbanhood/web deploy --prod "$DEPLOY"
+
+              # Step 3: Graft server.js and .next/server from the standalone build.
+              # Next.js in a pnpm workspace nests the output: standalone/apps/web/
               if [ -d "$SD/apps/web" ]; then
-                echo "=== flattening nested standalone ==="
-                ( cd "$SD/apps/web" && tar cf - . ) | ( cd "$SD" && tar xf - )
-                rm -rf "$SD/apps"
+                SRC="$SD/apps/web"
+              else
+                SRC="$SD"
               fi
+              cp "$SRC/server.js" "$DEPLOY/server.js"
+              mkdir -p "$DEPLOY/.next"
+              cp -r "$SRC/.next/server" "$DEPLOY/.next/server"
 
-              # Amplify checks for required-server-files.json at the artifact root.
-              # With baseDirectory=.next/standalone, artifact root is standalone/.
-              # The file lives in .next/ (not standalone/), so copy it in.
-              cp apps/web/.next/required-server-files.json "$SD/"
+              # Step 4: Copy files required by Amplify WEB_COMPUTE validation
+              cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
+              cp "apps/web/.next/required-server-files.json" "$DEPLOY/.next/required-server-files.json"
+              cp "apps/web/.next/BUILD_ID" "$DEPLOY/.next/BUILD_ID" 2>/dev/null || true
+              cp apps/web/.next/*.json "$DEPLOY/.next/" 2>/dev/null || true
+              cp -r "apps/web/.next/static" "$DEPLOY/.next/static"
+              [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/public" || true
 
-              # Copy static assets and public dir into standalone
-              cp -r apps/web/.next/static "$SD/.next/static"
-              [ -d apps/web/public ] && cp -r apps/web/public "$SD/public" || true
+              # Step 5: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
+              rm -rf "$DEPLOY/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
+              rm -rf "$DEPLOY/node_modules/@next/swc-"* 2>/dev/null || true
 
-              # Verify all three things Amplify checks for
-              [ -f "$SD/required-server-files.json" ] \
+              # Verify critical files exist before handing off to Amplify
+              [ -f "$DEPLOY/required-server-files.json" ] \
                 && echo "OK: required-server-files.json" \
                 || { echo "FAIL: required-server-files.json missing"; exit 1; }
-              [ -f "$SD/server.js" ] \
+              [ -f "$DEPLOY/server.js" ] \
                 && echo "OK: server.js" \
                 || { echo "FAIL: server.js missing"; exit 1; }
-              echo "=== node_modules/next location ==="
-              find "$SD/node_modules" -maxdepth 4 -name "package.json" \
-                -path "*/next/package.json" 2>/dev/null | head -5
-              [ -d "$SD/node_modules/next" ] \
+              [ -d "$DEPLOY/.next/server" ] \
+                && echo "OK: .next/server" \
+                || { echo "FAIL: .next/server missing"; exit 1; }
+              [ -d "$DEPLOY/node_modules/next" ] \
                 && echo "OK: node_modules/next" \
-                || echo "WARNING: node_modules/next not at flat path (may be in .pnpm)"
+                || echo "WARNING: node_modules/next not at flat path"
       artifacts:
-        baseDirectory: .next/standalone
+        baseDirectory: .next/deploy
         files:
           - '**/*'
       cache:
