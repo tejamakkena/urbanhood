@@ -42,7 +42,7 @@ resource "aws_amplify_app" "main" {
     S3_ACCESS_KEY_ID          = var.s3_access_key_id
     S3_SECRET_ACCESS_KEY      = var.s3_secret_access_key
     NODE_ENV                  = "production"
-    _LIVE_UPDATES             = jsonencode([{ pkg = "next", type = "framework", version = "latest" }])
+    _LIVE_UPDATES             = jsonencode([{ pkg = "next", type = "framework", version = "14" }])
   }
 
   auto_branch_creation_config {

@@ -30,11 +30,30 @@ applications:
               [ -d "$SD" ] || { echo "ERROR: standalone dir missing after build"; exit 1; }
 
               # Step 2: pnpm deploy creates a self-contained dir with all production deps.
-              # Unlike the raw pnpm store, every symlink in .pnpm resolves within DEPLOY/,
-              # so there are no broken cross-directory symlinks after Amplify copies files.
+              # Every symlink in .pnpm resolves within DEPLOY/ — no broken cross-dir symlinks.
               pnpm --filter @urbanhood/web deploy --prod "$DEPLOY"
 
-              # Step 3: Graft server.js and .next/server from the standalone build.
+              # Step 3: Copy generated Prisma engine into deploy node_modules.
+              # pnpm deploy installs @prisma/client fresh but without the generated
+              # .prisma/client/ engine binary. Copy it from the workspace where
+              # db:generate already ran in preBuild.
+              PRISMA_STORE="$(find node_modules/.pnpm -maxdepth 2 -type d \
+                -name '@prisma+client@*' 2>/dev/null | head -1)"
+              if [ -d "$PRISMA_STORE/node_modules/.prisma" ]; then
+                DEPLOY_PRISMA_STORE="$(find "$DEPLOY/node_modules/.pnpm" -maxdepth 2 \
+                  -type d -name '@prisma+client@*' 2>/dev/null | head -1)"
+                if [ -n "$DEPLOY_PRISMA_STORE" ]; then
+                  cp -r "$PRISMA_STORE/node_modules/.prisma" \
+                    "$DEPLOY_PRISMA_STORE/node_modules/.prisma"
+                  echo "OK: Copied Prisma engine to deploy"
+                else
+                  echo "WARNING: @prisma+client not found in deploy .pnpm store"
+                fi
+              else
+                echo "WARNING: Prisma engine not found in workspace — was db:generate run?"
+              fi
+
+              # Step 4: Graft server.js and .next/server from the standalone build.
               # Next.js in a pnpm workspace nests the output: standalone/apps/web/
               if [ -d "$SD/apps/web" ]; then
                 SRC="$SD/apps/web"
@@ -45,7 +64,7 @@ applications:
               mkdir -p "$DEPLOY/.next"
               cp -r "$SRC/.next/server" "$DEPLOY/.next/server"
 
-              # Step 4: Copy files required by Amplify WEB_COMPUTE validation
+              # Step 5: Copy files required by Amplify WEB_COMPUTE validation
               cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
               cp "apps/web/.next/required-server-files.json" "$DEPLOY/.next/required-server-files.json"
               cp "apps/web/.next/BUILD_ID" "$DEPLOY/.next/BUILD_ID" 2>/dev/null || true
@@ -53,7 +72,7 @@ applications:
               cp -r "apps/web/.next/static" "$DEPLOY/.next/static"
               [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/public" || true
 
-              # Step 5: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
+              # Step 6: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
               rm -rf "$DEPLOY/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
               rm -rf "$DEPLOY/node_modules/@next/swc-"* 2>/dev/null || true
 
