@@ -20,8 +20,7 @@ resource "aws_db_instance" "main" {
   password          = random_password.db.result
 
   allocated_storage     = 20
-  max_allocated_storage = 100
-  storage_type          = "gp3"
+  storage_type          = "gp2"
   storage_encrypted     = true
 
   db_subnet_group_name   = var.db_subnet_group_name
