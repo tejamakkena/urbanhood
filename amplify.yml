@@ -25,13 +25,26 @@ applications:
               pnpm --filter @urbanhood/web build
 
               SD="apps/web/.next/standalone"
-              DEPLOY="apps/web/.next/deploy"
+              # Deploy dir MUST be outside .next/ — putting it inside causes pnpm to
+              # create a node_modules/@urbanhood/web symlink back into the source
+              # package, which Next.js's recursive-delete then follows and corrupts
+              # the source on subsequent builds.
+              DEPLOY="apps/web/.amplify-deploy"
 
               [ -d "$SD" ] || { echo "ERROR: standalone dir missing after build"; exit 1; }
 
               # Step 2: pnpm deploy creates a self-contained dir with all production deps.
               # Every symlink in .pnpm resolves within DEPLOY/ — no broken cross-dir symlinks.
-              pnpm --filter @urbanhood/web deploy --prod "$DEPLOY"
+              # Use absolute path: pnpm --filter resolves relative paths from the
+              # filtered package's directory, not the workspace root.
+              rm -rf "$DEPLOY"
+              pnpm --filter @urbanhood/web deploy --prod "$PWD/$DEPLOY"
+
+              # pnpm deploy creates node_modules/@urbanhood/web → workspace source
+              # as a self-reference. Remove it: the deployed app IS the package, no
+              # one needs to require '@urbanhood/web', and the symlink causes Amplify
+              # artifact packaging to recurse into the source tree.
+              rm -f "$DEPLOY/node_modules/@urbanhood/web"
 
               # Step 3: Copy generated Prisma engine into deploy node_modules.
               # pnpm deploy installs @prisma/client fresh but without the generated
@@ -92,7 +105,7 @@ applications:
                 && echo "OK: node_modules/next" \
                 || echo "WARNING: node_modules/next not at flat path"
       artifacts:
-        baseDirectory: .next/deploy
+        baseDirectory: .amplify-deploy
         files:
           - '**/*'
       cache:
