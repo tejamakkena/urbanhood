@@ -59,6 +59,6 @@ jobs:
           eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive
 
       - name: EAS Submit (production only)
-        if: ${{ (inputs.profile == 'production' || startsWith(github.ref, 'refs/tags/')) && inputs.platform != '' }}
+        if: ${{ inputs.profile == 'production' || startsWith(github.ref, 'refs/tags/') }}
         working-directory: apps/mobile
         run: eas submit --platform "${{ inputs.platform || 'all' }}" --latest --non-interactive

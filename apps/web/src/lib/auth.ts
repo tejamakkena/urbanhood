@@ -4,10 +4,14 @@ import type { NextAuthOptions } from 'next-auth'
 import EmailProvider from 'next-auth/providers/email'
 import GoogleProvider from 'next-auth/providers/google'
 
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET env vars')
+}
+
 const providers: NextAuthOptions['providers'] = [
   GoogleProvider({
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   }),
 ]
 
@@ -45,11 +49,6 @@ export const authOptions: NextAuthOptions = {
         session.user.role = user.role
       }
       return session
-    },
-  },
-  events: {
-    async createUser({ user }) {
-      void user
     },
   },
 }

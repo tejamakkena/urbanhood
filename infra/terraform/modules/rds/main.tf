@@ -21,14 +21,14 @@ resource "aws_db_instance" "main" {
 
   allocated_storage     = 20
   max_allocated_storage = 100
-  storage_type          = "gp2"
+  storage_type          = "gp3"
   storage_encrypted     = true
 
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [var.security_group_id]
   publicly_accessible    = true
 
-  backup_retention_period = 0
+  backup_retention_period = var.env == "prod" ? 7 : 1
 
   auto_minor_version_upgrade = true
   deletion_protection        = var.deletion_protection

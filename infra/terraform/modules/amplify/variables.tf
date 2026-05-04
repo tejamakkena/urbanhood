@@ -32,10 +32,6 @@ variable "app_domain" {
   default     = ""
 }
 
-variable "sending_domain" {
-  type = string
-}
-
 # App secrets — passed from SSM outputs or GitHub Secrets
 variable "database_url" {
   type      = string
