@@ -57,9 +57,8 @@ module "amplify" {
 
   github_repository = var.github_repository
   github_token      = var.github_token
-  branch_name       = "main"
-  app_domain        = var.app_domain
-  sending_domain    = var.sending_domain
+  branch_name  = "main"
+  app_domain   = var.app_domain
 
   database_url         = module.rds.database_url
   nextauth_secret      = var.nextauth_secret

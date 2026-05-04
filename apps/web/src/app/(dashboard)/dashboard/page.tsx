@@ -1,10 +1,12 @@
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { Badge } from '@urbanhood/ui'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
   const session = await getSession()
-  const user = session!.user
+  if (!session?.user) redirect('/login?callbackUrl=/dashboard')
+  const user = session.user
 
   return (
     <div>

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 
@@ -8,7 +9,7 @@ export async function getSession() {
 export async function requireSession() {
   const session = await getSession()
   if (!session?.user) {
-    throw new Error('Unauthorized')
+    redirect('/login')
   }
   return session
 }

@@ -6,7 +6,9 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/ui/**'
+      - 'packages/db/src/**'
       - 'amplify.yml'
+      - '.npmrc'
       - '.github/workflows/deploy.yml'
       # Exclude infra and db schema — those have their own workflows
       - '!infra/**'
@@ -20,7 +22,7 @@ permissions:
 
 jobs:
   typecheck:
-    name: Type Check
+    name: Type Check & Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +43,9 @@ jobs:
         env:
           DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
         run: pnpm --filter @urbanhood/db db:generate
+
+      - name: Lint
+        run: pnpm --filter @urbanhood/web lint
 
       - name: Type check
         run: pnpm --filter @urbanhood/web typecheck

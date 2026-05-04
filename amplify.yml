@@ -47,10 +47,12 @@ applications:
                     "$DEPLOY_PRISMA_STORE/node_modules/.prisma"
                   echo "OK: Copied Prisma engine to deploy"
                 else
-                  echo "WARNING: @prisma+client not found in deploy .pnpm store"
+                  echo "ERROR: @prisma+client not found in deploy .pnpm store"
+                  exit 1
                 fi
               else
-                echo "WARNING: Prisma engine not found in workspace — was db:generate run?"
+                echo "ERROR: Prisma engine not found in workspace — was db:generate run?"
+                exit 1
               fi
 
               # Step 4: Graft server.js and .next/server from the standalone build.

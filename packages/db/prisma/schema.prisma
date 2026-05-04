@@ -97,6 +97,7 @@ model Listing {
   @@index([category])
   @@index([city, state])
   @@index([status])
+  @@index([createdAt])
 }
 
 model Booking {

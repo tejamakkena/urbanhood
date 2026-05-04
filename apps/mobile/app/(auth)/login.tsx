@@ -104,7 +104,7 @@ export default function LoginScreen() {
           )}
 
           <Text style={styles.switchText}>
-            Don&apos;t have an account?{' '}
+            {"Don't have an account?"}{' '}
             <Text style={styles.switchLink} onPress={() => router.replace('/(auth)/register')}>
               Sign up
             </Text>

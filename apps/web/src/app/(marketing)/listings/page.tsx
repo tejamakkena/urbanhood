@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { ListingCategory } from '@urbanhood/db'
+import { prisma, ListingCategory } from '@urbanhood/db'
 import { Badge } from '@urbanhood/ui'
 import Link from 'next/link'
 
@@ -23,8 +23,6 @@ interface ListingsPageProps {
 }
 
 export default async function ListingsPage({ searchParams }: ListingsPageProps) {
-  const { prisma } = await import('@urbanhood/db')
-
   const listings = await prisma.listing.findMany({
     where: {
       status: 'ACTIVE',

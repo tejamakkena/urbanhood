@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { prisma } from '@urbanhood/db'
@@ -9,35 +10,38 @@ interface ListingPageProps {
   params: { id: string }
 }
 
+const getListingData = cache(async (id: string) => {
+  const [listing, ratingData] = await Promise.all([
+    prisma.listing.findUnique({
+      where: { id, status: 'ACTIVE' },
+      include: {
+        supplier: { select: { id: true, name: true, image: true, createdAt: true } },
+        reviews: {
+          include: { reviewer: { select: { name: true, image: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        _count: { select: { reviews: true } },
+      },
+    }),
+    prisma.review.aggregate({
+      where: { listingId: id },
+      _avg: { rating: true },
+    }),
+  ])
+  return { listing, avgRating: ratingData._avg.rating }
+})
+
 export async function generateMetadata({ params }: ListingPageProps): Promise<Metadata> {
-  const listing = await prisma.listing.findUnique({
-    where: { id: params.id },
-    select: { title: true, description: true },
-  })
+  const { listing } = await getListingData(params.id)
   if (!listing) return { title: 'Not found' }
   return { title: listing.title, description: listing.description.slice(0, 160) }
 }
 
 export default async function ListingPage({ params }: ListingPageProps) {
-  const listing = await prisma.listing.findUnique({
-    where: { id: params.id, status: 'ACTIVE' },
-    include: {
-      supplier: { select: { id: true, name: true, image: true, createdAt: true } },
-      reviews: {
-        include: { reviewer: { select: { name: true, image: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
-      _count: { select: { reviews: true } },
-    },
-  })
+  const { listing, avgRating } = await getListingData(params.id)
 
   if (!listing) notFound()
-
-  const avgRating =
-    listing.reviews.length > 0
-      ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) / listing.reviews.length
-      : null
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -79,7 +83,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
                 <Package className="h-4 w-4" />
                 Qty available: {listing.quantity}
               </span>
-              {avgRating && (
+              {avgRating !== null && (
                 <span>⭐ {avgRating.toFixed(1)} ({listing._count.reviews} reviews)</span>
               )}
             </div>

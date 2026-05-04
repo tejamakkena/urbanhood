@@ -93,5 +93,5 @@ variable "rds_instance_class" {
 
 variable "rds_deletion_protection" {
   type    = bool
-  default = false
+  default = true
 }
