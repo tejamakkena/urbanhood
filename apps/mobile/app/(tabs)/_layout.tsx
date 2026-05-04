@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
-import { HapticTab } from '../src/components/HapticTab'
-import { Colors } from '../src/constants/Colors'
-import { useColorScheme } from '../src/hooks/useColorScheme'
+import { HapticTab } from '@/components/HapticTab'
+import { Colors } from '@/constants/Colors'
+import { useColorScheme } from '@/hooks/useColorScheme'
 import { Home, Search, CalendarDays, User } from 'lucide-react-native'
 
 export default function TabLayout() {
