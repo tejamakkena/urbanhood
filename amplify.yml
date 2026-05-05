@@ -42,10 +42,13 @@ applications:
               rm -rf "$DEPLOY/.next"
               cp -r "apps/web/.next" "$DEPLOY/.next"
 
-              # Step 4: Copy public dir
+              # Step 4: Copy required-server-files.json to artifact root (Amplify looks here)
+              cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
+
+              # Step 5: Copy public dir
               [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/public" || true
 
-              # Step 5: Copy the Prisma engine binary into the deploy node_modules.
+              # Step 6: Copy the Prisma engine binary into the deploy node_modules.
               # pnpm deploy installs @prisma/client fresh but without the generated
               # .prisma/client/ engine; db:generate ran in preBuild so copy from there.
               PRISMA_STORE="$(find node_modules/.pnpm -maxdepth 2 -type d \
@@ -66,7 +69,7 @@ applications:
                 exit 1
               fi
 
-              # Step 6: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
+              # Step 7: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
               rm -rf "$DEPLOY/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
               rm -rf "$DEPLOY/node_modules/@next/swc-"* 2>/dev/null || true
 
@@ -74,9 +77,9 @@ applications:
               [ -f "$DEPLOY/.next/next-server.js.nft.json" ] \
                 && echo "OK: server trace files present" \
                 || { echo "FAIL: next-server.js.nft.json missing"; exit 1; }
-              [ -f "$DEPLOY/.next/required-server-files.json" ] \
-                && echo "OK: required-server-files.json" \
-                || { echo "FAIL: required-server-files.json missing"; exit 1; }
+              [ -f "$DEPLOY/required-server-files.json" ] \
+                && echo "OK: required-server-files.json at root" \
+                || { echo "FAIL: required-server-files.json missing at root"; exit 1; }
               [ -d "$DEPLOY/node_modules/next" ] \
                 && echo "OK: node_modules/next" \
                 || { echo "FAIL: node_modules/next missing"; exit 1; }
