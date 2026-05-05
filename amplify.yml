@@ -25,31 +25,42 @@ applications:
               pnpm --filter @urbanhood/web build
 
               SD="apps/web/.next/standalone"
-              # Deploy dir MUST be outside .next/ — putting it inside causes pnpm to
-              # create a node_modules/@urbanhood/web symlink back into the source
-              # package, which Next.js's recursive-delete then follows and corrupts
-              # the source on subsequent builds.
               DEPLOY="apps/web/.amplify-deploy"
 
               [ -d "$SD" ] || { echo "ERROR: standalone dir missing after build"; exit 1; }
 
-              # Step 2: pnpm deploy creates a self-contained dir with all production deps.
-              # Every symlink in .pnpm resolves within DEPLOY/ — no broken cross-dir symlinks.
-              # Use absolute path: pnpm --filter resolves relative paths from the
-              # filtered package's directory, not the workspace root.
+              # Step 2: Use the standalone output as the artifact base.
+              # The .nft.json trace files inside standalone use relative paths calibrated
+              # to the monorepo depth (e.g. ../../../../../node_modules from
+              # apps/web/.next/server/pages/). Preserving the apps/web/ nesting keeps
+              # those paths resolving correctly at runtime.
               rm -rf "$DEPLOY"
-              pnpm --filter @urbanhood/web deploy --prod "$PWD/$DEPLOY"
+              cp -a "$SD/." "$DEPLOY/"
 
-              # pnpm deploy creates node_modules/@urbanhood/web → workspace source
-              # as a self-reference. Remove it: the deployed app IS the package, no
-              # one needs to require '@urbanhood/web', and the symlink causes Amplify
-              # artifact packaging to recurse into the source tree.
-              rm -f "$DEPLOY/node_modules/@urbanhood/web"
+              # Step 3: Add a root-level server.js shim so Amplify finds the entry point.
+              # The real server.js lives at apps/web/server.js inside the artifact; it
+              # calls process.chdir(__dirname) so all relative paths resolve from there.
+              printf 'require("./apps/web/server.js")\n' > "$DEPLOY/server.js"
 
-              # Step 3: Copy generated Prisma engine into deploy node_modules.
-              # pnpm deploy installs @prisma/client fresh but without the generated
-              # .prisma/client/ engine binary. Copy it from the workspace where
-              # db:generate already ran in preBuild.
+              # Step 4: Copy static assets and public dir (standalone omits them).
+              cp -r "apps/web/.next/static" "$DEPLOY/apps/web/.next/static"
+              [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/apps/web/public" || true
+
+              # Step 5: Copy the root-level .nft.json trace files that Amplify WEB_COMPUTE
+              # validation requires. These live in .next/ (not .next/server/) and are not
+              # included in the standalone output.
+              cp "apps/web/.next/next-server.js.nft.json" \
+                 "$DEPLOY/apps/web/.next/next-server.js.nft.json"
+              cp "apps/web/.next/next-minimal-server.js.nft.json" \
+                 "$DEPLOY/apps/web/.next/next-minimal-server.js.nft.json"
+
+              # Step 6: Copy required-server-files.json to the artifact root for Amplify
+              # validation (it also exists at apps/web/.next/ inside the standalone).
+              cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
+
+              # Step 7: Copy the generated Prisma engine binary into the standalone's
+              # pnpm store. The standalone includes @prisma/client but not the generated
+              # .prisma/client/ engine; db:generate ran in preBuild so copy from there.
               PRISMA_STORE="$(find node_modules/.pnpm -maxdepth 2 -type d \
                 -name '@prisma+client@*' 2>/dev/null | head -1)"
               if [ -d "$PRISMA_STORE/node_modules/.prisma" ]; then
@@ -58,9 +69,9 @@ applications:
                 if [ -n "$DEPLOY_PRISMA_STORE" ]; then
                   cp -r "$PRISMA_STORE/node_modules/.prisma" \
                     "$DEPLOY_PRISMA_STORE/node_modules/.prisma"
-                  echo "OK: Copied Prisma engine to deploy"
+                  echo "OK: Copied Prisma engine to standalone deploy"
                 else
-                  echo "ERROR: @prisma+client not found in deploy .pnpm store"
+                  echo "ERROR: @prisma+client not found in standalone deploy .pnpm store"
                   exit 1
                 fi
               else
@@ -68,49 +79,32 @@ applications:
                 exit 1
               fi
 
-              # Step 4: Graft server.js from standalone and .next/server from the
-              # original build output. The standalone .next/server/ omits the
-              # .nft.json trace files that Amplify WEB_COMPUTE validation requires;
-              # the original build output has them.
-              if [ -d "$SD/apps/web" ]; then
-                SRC="$SD/apps/web"
-              else
-                SRC="$SD"
-              fi
-              cp "$SRC/server.js" "$DEPLOY/server.js"
-              mkdir -p "$DEPLOY/.next"
-              cp -r "apps/web/.next/server" "$DEPLOY/.next/server"
-
-              # Step 5: Copy files required by Amplify WEB_COMPUTE validation
-              cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
-              cp "apps/web/.next/required-server-files.json" "$DEPLOY/.next/required-server-files.json"
-              cp "apps/web/.next/BUILD_ID" "$DEPLOY/.next/BUILD_ID" 2>/dev/null || true
-              cp apps/web/.next/*.json "$DEPLOY/.next/" 2>/dev/null || true
-              cp -r "apps/web/.next/static" "$DEPLOY/.next/static"
-              [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/public" || true
-
-              # Step 6: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
+              # Step 8: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
               rm -rf "$DEPLOY/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
-              rm -rf "$DEPLOY/node_modules/@next/swc-"* 2>/dev/null || true
+              rm -rf "$DEPLOY/apps/web/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
 
-              # Verify critical files exist before handing off to Amplify
+              # Verify the artifact before handing off to Amplify
+              [ -f "$DEPLOY/server.js" ] \
+                && echo "OK: server.js (shim)" \
+                || { echo "FAIL: server.js missing"; exit 1; }
+              [ -f "$DEPLOY/apps/web/server.js" ] \
+                && echo "OK: apps/web/server.js (real)" \
+                || { echo "FAIL: apps/web/server.js missing"; exit 1; }
               [ -f "$DEPLOY/required-server-files.json" ] \
                 && echo "OK: required-server-files.json" \
                 || { echo "FAIL: required-server-files.json missing"; exit 1; }
-              [ -f "$DEPLOY/server.js" ] \
-                && echo "OK: server.js" \
-                || { echo "FAIL: server.js missing"; exit 1; }
-              [ -d "$DEPLOY/.next/server" ] \
-                && echo "OK: .next/server" \
-                || { echo "FAIL: .next/server missing"; exit 1; }
-              [ -d "$DEPLOY/node_modules/next" ] \
-                && echo "OK: node_modules/next" \
-                || echo "WARNING: node_modules/next not at flat path"
-              NTF_COUNT=$(find "$DEPLOY/.next/server" -name "*.nft.json" 2>/dev/null | wc -l)
-              echo "INFO: found $NTF_COUNT .nft.json trace files in deploy"
-              [ "$NTF_COUNT" -gt 0 ] \
-                && echo "OK: .nft.json trace files present" \
-                || { echo "FAIL: no .nft.json trace files — Amplify WEB_COMPUTE will reject this artifact"; exit 1; }
+              [ -f "$DEPLOY/apps/web/.next/next-server.js.nft.json" ] \
+                && echo "OK: next-server.js.nft.json" \
+                || { echo "FAIL: next-server.js.nft.json missing"; exit 1; }
+              [ -d "$DEPLOY/apps/web/.next/server" ] \
+                && echo "OK: apps/web/.next/server" \
+                || { echo "FAIL: apps/web/.next/server missing"; exit 1; }
+              [ -d "$DEPLOY/apps/web/.next/static" ] \
+                && echo "OK: apps/web/.next/static" \
+                || { echo "FAIL: apps/web/.next/static missing"; exit 1; }
+              NTF=$(find "$DEPLOY/apps/web/.next/server" -name "*.nft.json" | wc -l)
+              echo "INFO: $NTF .nft.json trace files in apps/web/.next/server"
+              [ "$NTF" -gt 0 ] || { echo "FAIL: no .nft.json trace files"; exit 1; }
       artifacts:
         baseDirectory: .amplify-deploy
         files:
