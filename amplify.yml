@@ -41,6 +41,10 @@ applications:
               # trace files Amplify WEB_COMPUTE validates.
               rm -rf "$DEPLOY/.next"
               cp -r "apps/web/.next" "$DEPLOY/.next"
+              # .next/cache is a build-time cache restored each run by Amplify's cache
+              # mechanism; shipping it inflates the artifact and will eventually cause
+              # Amplify to fail validating trace files once the zip exceeds its size limit.
+              rm -rf "$DEPLOY/.next/cache"
 
               # Step 4: Copy required-server-files.json to artifact root (Amplify looks here)
               cp "apps/web/.next/required-server-files.json" "$DEPLOY/required-server-files.json"
@@ -90,6 +94,8 @@ applications:
         baseDirectory: .amplify-deploy
         files:
           - '**/*'
+          - '.next/**/*'
+          - '.next'
       cache:
         paths:
           - ../../node_modules/**/*
