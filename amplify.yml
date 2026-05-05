@@ -20,9 +20,71 @@ applications:
               while [ "$PWD" != "/" ] && [ ! -f pnpm-workspace.yaml ]; do cd ..; done
               [ -f pnpm-workspace.yaml ] || { echo "ERROR: pnpm-workspace.yaml not found"; exit 1; }
               echo "=== building from: $PWD ==="
+
+              # Step 1: Build Next.js (no standalone — Amplify manages the server runtime)
               pnpm --filter @urbanhood/web build
+
+              DEPLOY="apps/web/.amplify-deploy"
+
+              # Step 2: Create self-contained node_modules via pnpm deploy.
+              # pnpm deploy resolves all workspace symlinks into a flat, portable
+              # node_modules/ directory — required because Amplify WEB_COMPUTE needs
+              # node_modules/next (and all other prod deps) present in the artifact.
+              rm -rf "$DEPLOY"
+              pnpm --filter @urbanhood/web deploy --prod "$PWD/$DEPLOY"
+              # Remove the self-reference symlink pnpm deploy always creates
+              rm -f "$DEPLOY/node_modules/@urbanhood/web"
+
+              # Step 3: Overlay the real .next/ build output.
+              # pnpm deploy may copy an incomplete .next/ (gitignore behaviour varies);
+              # replace it with the authoritative build output that has all .nft.json
+              # trace files Amplify WEB_COMPUTE validates.
+              rm -rf "$DEPLOY/.next"
+              cp -r "apps/web/.next" "$DEPLOY/.next"
+
+              # Step 4: Copy public dir
+              [ -d "apps/web/public" ] && cp -r "apps/web/public" "$DEPLOY/public" || true
+
+              # Step 5: Copy the Prisma engine binary into the deploy node_modules.
+              # pnpm deploy installs @prisma/client fresh but without the generated
+              # .prisma/client/ engine; db:generate ran in preBuild so copy from there.
+              PRISMA_STORE="$(find node_modules/.pnpm -maxdepth 2 -type d \
+                -name '@prisma+client@*' 2>/dev/null | head -1)"
+              if [ -d "$PRISMA_STORE/node_modules/.prisma" ]; then
+                DEPLOY_PRISMA_STORE="$(find "$DEPLOY/node_modules/.pnpm" -maxdepth 2 \
+                  -type d -name '@prisma+client@*' 2>/dev/null | head -1)"
+                if [ -n "$DEPLOY_PRISMA_STORE" ]; then
+                  cp -r "$PRISMA_STORE/node_modules/.prisma" \
+                    "$DEPLOY_PRISMA_STORE/node_modules/.prisma"
+                  echo "OK: Prisma engine copied"
+                else
+                  echo "ERROR: @prisma+client not found in deploy .pnpm store"
+                  exit 1
+                fi
+              else
+                echo "ERROR: Prisma engine not found — was db:generate run?"
+                exit 1
+              fi
+
+              # Step 6: Strip build-time SWC compiler binaries (~276 MB, not needed at runtime)
+              rm -rf "$DEPLOY/node_modules/.pnpm/@next+swc-"* 2>/dev/null || true
+              rm -rf "$DEPLOY/node_modules/@next/swc-"* 2>/dev/null || true
+
+              # Verify the artifact before handing off to Amplify
+              [ -f "$DEPLOY/.next/next-server.js.nft.json" ] \
+                && echo "OK: server trace files present" \
+                || { echo "FAIL: next-server.js.nft.json missing"; exit 1; }
+              [ -f "$DEPLOY/.next/required-server-files.json" ] \
+                && echo "OK: required-server-files.json" \
+                || { echo "FAIL: required-server-files.json missing"; exit 1; }
+              [ -d "$DEPLOY/node_modules/next" ] \
+                && echo "OK: node_modules/next" \
+                || { echo "FAIL: node_modules/next missing"; exit 1; }
+              NTF=$(find "$DEPLOY/.next/server" -name "*.nft.json" 2>/dev/null | wc -l)
+              echo "INFO: $NTF page-level .nft.json trace files in deploy"
+              [ "$NTF" -gt 0 ] || { echo "FAIL: no page-level .nft.json trace files"; exit 1; }
       artifacts:
-        baseDirectory: .next
+        baseDirectory: .amplify-deploy
         files:
           - '**/*'
       cache:
